@@ -1,1 +1,1 @@
-# the-pixel-project-contract
+# The Pixel Project (Contract)
