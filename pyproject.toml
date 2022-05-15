@@ -1,0 +1,16 @@
+# linting
+[tool.black]
+line-length = 120
+target-version = ['py39']
+
+[tool.isort]
+profile = "google"
+py_version = 310
+line_length = 120
+
+# testing
+[tool.pytest.ini_options]
+addopts = "-s"
+testpaths = [
+    "tests",
+]

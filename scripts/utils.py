@@ -1,10 +1,10 @@
-from brownie import accounts, config, network
+from brownie import accounts
+from brownie import config
+from brownie import network
 
 NON_FORKED_LOCAL_BLOCKCHAIN_ENVIRONMENTS = ["development"]
 FORKED_BLOCKCHAIN_ENVIRONMENTS = []
-LOCAL_BLOCKCHAIN_ENVIRONMENTS = (
-    NON_FORKED_LOCAL_BLOCKCHAIN_ENVIRONMENTS + FORKED_BLOCKCHAIN_ENVIRONMENTS
-)
+LOCAL_BLOCKCHAIN_ENVIRONMENTS = NON_FORKED_LOCAL_BLOCKCHAIN_ENVIRONMENTS + FORKED_BLOCKCHAIN_ENVIRONMENTS
 
 
 def get_account(index=None):

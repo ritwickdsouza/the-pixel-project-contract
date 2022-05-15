@@ -1,64 +1,95 @@
-from brownie import Canvas, Pixel
+from brownie import Canvas
+from brownie.exceptions import VirtualMachineError
+import pytest
 
 from scripts.utils import get_account
 
 
-def test_set_pixel_contract():
+def test_set_canvas_controller_contract():
     # given
     deploy_account = get_account(0)
     canvas = Canvas.deploy({"from": deploy_account})
 
     # when
-    pixel_account = get_account(1)
-    tx = canvas.setPixelContract(pixel_account.address)
+    canvas_controller_contract = get_account(1)
+    tx = canvas.setCanvasControllerContract(canvas_controller_contract)
     tx.wait(1)
 
     # then
-    assert canvas.pixelContract() == pixel_account.address
+    assert canvas.canvasControllerContract() == canvas_controller_contract.address
 
 
-def test_claim_pixel_fresh_mint():
+def test_initial_pixel_color_map():
     # given
     deploy_account = get_account(0)
-
     canvas = Canvas.deploy({"from": deploy_account})
-    pixel = Pixel.deploy({"from": deploy_account})
+    m, n = canvas.M(), canvas.N()
 
-    pixel.setCanvasContract(canvas.address)
-    canvas.setPixelContract(pixel.address)
-
-    tx = pixel.setGridSize(3, 3)
-    tx.wait(1)
-
-    # when
-    user_account = get_account(1)
-    tx = canvas.claimPixel(1, 1, {"from": user_account})
-    tx.wait()
-
-    # then
-    assert pixel.totalSupply() == 1
-    assert pixel.ownerOf(pixel.getTokenId(1, 1).return_value) == user_account.address
+    # when / then
+    assert canvas.getPixelColorMap() == tuple(tuple(0 for _ in range(m)) for _ in range(n))
 
 
-def test_claim_pixel_already_minted():
+def test_initial_pixel_color_row():
     # given
     deploy_account = get_account(0)
-
     canvas = Canvas.deploy({"from": deploy_account})
-    pixel = Pixel.deploy({"from": deploy_account})
+    m, n = canvas.M(), canvas.N()
 
-    pixel.setCanvasContract(canvas.address)
-    canvas.setPixelContract(pixel.address)
+    # when / then
+    assert canvas.getPixelColorRow(0) == tuple(0 for _ in range(m))
 
-    pixel.setGridSize(3, 3)
-    user_account_1 = get_account(1)
-    tx = pixel.mintPixel(1, 1, {"from": user_account_1})
-    tx.wait(1)
+
+def test_claim_pixel_owner():
+    # given
+    deploy_account = get_account(0)
+    canvas = Canvas.deploy({"from": deploy_account})
+    x, y, color, claimed_by = 3, 5, 3, get_account(1)
 
     # when
-    user_account_2 = get_account(2)
-    canvas.claimPixel(1, 1, {"from": user_account_2})
+    tx = canvas.claimPixel(x, y, color, claimed_by)
+    tx.wait(1)
+    tx = canvas.claimPixel(x, y, color, claimed_by)
+    tx.wait(1)
 
     # then
-    assert pixel.totalSupply() == 1
-    assert pixel.ownerOf(pixel.getTokenId(1, 1).return_value) == user_account_2.address
+    assert canvas.pixelColorMap(3, 5) == color
+    assert canvas.pixelOwnerMap(3, 5) == claimed_by.address
+    assert canvas.pixelClaimCountMap(3, 5) == 2
+
+
+def test_claim_pixel_claim_controller_contract():
+    # given
+    deploy_account = get_account(0)
+    canvas = Canvas.deploy({"from": deploy_account})
+    canvas_controller_contract = get_account(1)
+    tx = canvas.setCanvasControllerContract(canvas_controller_contract)
+    tx.wait(1)
+
+    x, y, color, claimed_by = 3, 5, 3, get_account(1)
+
+    # when
+    tx = canvas.claimPixel(x, y, color, claimed_by, {"from": canvas_controller_contract})
+    tx.wait(1)
+    tx = canvas.claimPixel(x, y, color, claimed_by)
+    tx.wait(1)
+
+    # then
+    assert canvas.pixelColorMap(3, 5) == color
+    assert canvas.pixelOwnerMap(3, 5) == claimed_by.address
+    assert canvas.pixelClaimCountMap(3, 5) == 2
+
+
+def test_claim_pixel_unknown_not_allowed():
+    # given
+    deploy_account = get_account(0)
+    canvas = Canvas.deploy({"from": deploy_account})
+    x, y, color, claimed_by = 3, 5, 3, get_account(1)
+
+    # when
+    unknown = get_account(1)
+    with pytest.raises(VirtualMachineError) as exec_info:
+        tx = canvas.claimPixel(x, y, color, claimed_by, {"from": unknown})
+        tx.wait(1)
+
+    # then
+    assert exec_info.value.message == "VM Exception while processing transaction: revert Permission denied"
